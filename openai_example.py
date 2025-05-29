@@ -12,13 +12,13 @@ OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "gpt-4o")
 
 
 def search_duckduckgo(
-    query: str, max_results: int = 5, region: str = "kr-kr", sites: list[str] | str | None = None
+    query: str, max_search_results: int = 5, region: str = "kr-kr", sites: list[str] | str | None = None
 ) -> list[dict]:
     """DuckDuckGo API를 이용한 웹 검색을 수행합니다.
 
     Args:
         query (str): 검색할 키워드
-        max_results (int, optional): 가져올 최대 검색 결과 수. 기본 값은 5개.
+        max_search_results (int, optional): 가져올 최대 검색 결과 수. 기본 값은 5개.
         region (str, optional): 검색 지역 코드. 기본값은 "kr-kr" (한국)
         sites (list[str] | str | None, optional): 검색할 특정 사이트 도메인. 기본값은 None.
                                                   단일 사이트: "naver.com"
@@ -38,19 +38,24 @@ def search_duckduckgo(
             query = f"{query} ({site_conditions})"
 
     with DDGS() as ddgs:
-        results = list(ddgs.text(query, max_results=max_results, region=region))
+        results = list(ddgs.text(query, max_results=max_search_results, region=region))
 
     return results
 
 
 def get_chat_completion_result_with_web_search(
-    query: str, max_results: int = 5, region: str = "kr-kr", sites: list[str] | str | None = None
+    query: str,
+    max_search_results: int = 5,
+    max_answer_results: int = 5,
+    region: str = "kr-kr",
+    sites: list[str] | str | None = None,
 ) -> str:
     """웹 검색 결과를 참고해 정확한 정보를 제공하는 OpenAI 예제 함수.
 
     Args:
         query (str): 검색할 키워드
-        max_results (int, optional): 가져올 최대 검색 결과 수. 기본 값은 5개.
+        max_search_results (int, optional): 가져올 최대 검색 결과 수. 기본 값은 5개.
+        max_answer_results (int, optional): GPT 답변에 포함할 최대 검색 결과 수. 기본 값은 5개.
         region (str, optional): 검색 지역 코드. 기본값은 "kr-kr" (한국)
         sites (list[str] | str | None, optional): 검색할 특정 사이트 도메인. 기본값은 None.
                                                   단일 사이트: "naver.com"
@@ -73,10 +78,10 @@ def get_chat_completion_result_with_web_search(
                         "type": "string",
                         "description": "Keywords to search the web for",
                     },
-                    "max_results": {
+                    "max_search_results": {
                         "type": "integer",
                         "description": "Maximum number of search results to fetch",
-                        "default": max_results,
+                        "default": max_search_results,
                     },
                 },
                 "required": ["query"],
@@ -88,7 +93,13 @@ def get_chat_completion_result_with_web_search(
     messages = [
         {
             "role": "system",
-            "content": "당신은 웹 검색 결과를 참고해 정확한 정보를 제공하는 어시스턴트입니다. 반드시 답변 마지막에는 참고한 웹 검색 결과의 링크를 제공해야 합니다.",
+            "content": f"""
+            당신은 웹 검색 결과를 참고해 정확한 정보를 제공하는 어시스턴트입니다. 
+            반드시 정부기관(.go.kr), 대학교(.ac.kr), 연구기관(.re.kr), 공공기관(.or.kr), 신뢰할 수 있는 의료기관 등 공신력 있는 사이트의 정보만 참고하여 답변하세요. 
+            개인 블로그나 상업적 사이트의 정보는 무시하세요. 
+            반드시 답변 마지막에는 참고한 공신력 있는 웹 검색 결과의 링크를 제공해야 합니다.
+            참고한 공신력 있는 웹 검색 결과의 링크는 최대 {max_answer_results}개까지만 제공해야 합니다.
+            """,
         },
         {"role": "user", "content": query},
     ]
@@ -130,5 +141,7 @@ def get_chat_completion_result_with_web_search(
 
 if __name__ == "__main__":
     REGION = "kr-kr"
-    SITES = ["https://www.amc.seoul.kr/asan/healthinfo"]  # 아산병원
-    get_chat_completion_result_with_web_search("당화혈색소 정상 수치 ", max_results=10, region=REGION, sites=SITES)
+    # SITES = ["https://www.amc.seoul.kr/asan/healthinfo"]  # 아산병원
+    get_chat_completion_result_with_web_search(
+        "당화혈색소 정상 수치 ", max_search_results=50, max_answer_results=5, region=REGION
+    )
